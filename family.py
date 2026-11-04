@@ -1,27 +1,18 @@
-"""What this family scrapes. Change this file first.
+"""What this family scrapes: the public MPLADS dashboard reports, for every state, house and term.
 
-FAMILY must equal the repo name (s1d-labs/<FAMILY>) and the family the hub owner added on scrape.s1d.me/runners.
-Each project is one queue of work on one site; `target` is the host it hits (the hub caps workers per target).
+One queue item = one report for one state. The combo is state,constituency,mp,house,tenure. House 2 = Lok Sabha (tenure 5 = 17th, 7 = 18th),
+house 1 = Rajya Sabha (tenure 1 = sitting, 2 = retired). A state number with no data gives an empty report.
 """
 import json
 from pathlib import Path
 
 FAMILY = json.loads((Path(__file__).parent / "scrape.json").read_text())["family"]
+HOST = "mplads.mospi.gov.in"
+TERMS = [(2, 5, "ls17"), (2, 7, "ls18"), (1, 1, "rs-sitting"), (1, 2, "rs-retired")]
+REPORTS = ["Works Recommended", "Works Sanctioned", "Works Completed", "Expenditure on Completed and On-going Works as on Date"]
+STATES = range(1, 41)
 
-PROJECTS = [
-    {
-        "name": f"{FAMILY}-books",              # project names: 2-64 chars of a-z 0-9 - _, start them with the family name
-        "title": "Books to Scrape catalogue",
-        "task": "crawl",                         # a task from scrape.json
-        "target": "books.toscrape.com",
-        "env": {"SITE": "https://books.toscrape.com"},
-        "probe": f"{FAMILY}:books.toscrape.com",
-        "unit_label": "page", "record_label": "book",
-        # the queue: one item per catalogue page; `expected` (records per item) gives progress and ETAs on the dashboard
-        "items": [{"key": f"page-{n}", "payload": {"url": f"https://books.toscrape.com/catalogue/page-{n}.html", "expected": 20}}
-                  for n in range(1, 51)],
-    },
-]
-
-# health checks the hub runs every minute; work for a project holds while its probe fails
-PROBES = [{"name": f"{FAMILY}:books.toscrape.com", "url": "https://books.toscrape.com/", "expect": "All products"}]
+PROJECTS = [{"name": f"{FAMILY}-works", "title": "MPLADS works", "task": "tiles", "unit_label": "report", "record_label": "work row",
+             "items": [{"key": f"s{s}-{tag}-{r.split()[0].lower()}-{r.split()[1].lower()}", "payload": {"state": s, "house": h, "tenure": t, "tag": tag, "report": r}}
+                       for s in STATES for h, t, tag in TERMS for r in REPORTS]}]
+PROBES = [{"name": f"{FAMILY}:{HOST}", "url": f"https://{HOST}/digigov/dashboard.html", "expect": "MPLADS"}]
